@@ -8,6 +8,7 @@
 
 #import "GKResizeableCropOverlayView.h"
 #import "GKCropBorderView.h"
+#import "GKImageCropView.h"
 
 #define kBorderCorrectionValue 12
 
@@ -41,9 +42,8 @@
 
 -(void)setFrame:(CGRect)frame{
     [super setFrame:frame];
-    CGFloat toolbarSize = UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad ? 0 : 54;
-    _contentView.frame = CGRectMake(self.bounds.size.width / 2 - _initialContentSize.width  / 2  , (self.bounds.size.height - toolbarSize) / 2 - _initialContentSize.height / 2 , _initialContentSize.width, _initialContentSize.height);
-    _cropBorderView.frame = CGRectMake(self.bounds.size.width / 2 - _initialContentSize.width  / 2 - kBorderCorrectionValue, (self.bounds.size.height - toolbarSize) / 2 - _initialContentSize.height / 2 - kBorderCorrectionValue, _initialContentSize.width + kBorderCorrectionValue*2, _initialContentSize.height + kBorderCorrectionValue*2);
+    _contentView.frame = CGRectMake(self.bounds.size.width / 2 - _initialContentSize.width  / 2  , (self.bounds.size.height) / 2 - _initialContentSize.height / 2 , _initialContentSize.width, _initialContentSize.height);
+    _cropBorderView.frame = CGRectMake(self.bounds.size.width / 2 - _initialContentSize.width  / 2 - kBorderCorrectionValue, (self.bounds.size.height) / 2 - _initialContentSize.height / 2 - kBorderCorrectionValue, _initialContentSize.width + kBorderCorrectionValue*2, _initialContentSize.height + kBorderCorrectionValue*2);
 }
 
 
@@ -93,15 +93,13 @@
 #pragma private
 
 -(void)_addContentViews{
-    CGFloat toolbarSize = UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad ? 0 : 54;
-
-    _contentView = [[UIView alloc] initWithFrame:CGRectMake(self.bounds.size.width / 2 - _initialContentSize.width  / 2  , (self.bounds.size.height - toolbarSize) / 2 - _initialContentSize.height / 2 , _initialContentSize.width, _initialContentSize.height)];
+    _contentView = [[UIView alloc] initWithFrame:CGRectMake(self.bounds.size.width / 2 - _initialContentSize.width  / 2  , (self.bounds.size.height) / 2 - _initialContentSize.height / 2 , _initialContentSize.width, _initialContentSize.height)];
     _contentView.backgroundColor = [UIColor clearColor];
     self.cropSize = _contentView.frame.size;
     [self addSubview:_contentView];
    // NSLog(@"x: %f y: %f %f", CGRectGetMinX(_contentView.frame), CGRectGetMinY(_contentView.frame), self.bounds.size.width);
     
-    _cropBorderView = [[GKCropBorderView alloc] initWithFrame:CGRectMake(self.bounds.size.width / 2 - _initialContentSize.width  / 2 - kBorderCorrectionValue, (self.bounds.size.height - toolbarSize) / 2 - _initialContentSize.height / 2 - kBorderCorrectionValue, _initialContentSize.width + kBorderCorrectionValue*2, _initialContentSize.height + kBorderCorrectionValue*2)];
+    _cropBorderView = [[GKCropBorderView alloc] initWithFrame:CGRectMake(self.bounds.size.width / 2 - _initialContentSize.width  / 2 - kBorderCorrectionValue, (self.bounds.size.height) / 2 - _initialContentSize.height / 2 - kBorderCorrectionValue, _initialContentSize.width + kBorderCorrectionValue*2, _initialContentSize.height + kBorderCorrectionValue*2)];
     [self addSubview:_cropBorderView];
 }
 
@@ -178,8 +176,6 @@
 }
 
 -(CGRect)_preventBorderFrameFromGettingTooSmallOrTooBig:(CGRect)newFrame{
-    CGFloat toolbarSize = UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad ? 0 : 54;
-
     if (newFrame.size.width < 64) {
         newFrame.size.width = _cropBorderView.frame.size.width;
         newFrame.origin.x = _cropBorderView.frame.origin.x;
@@ -202,8 +198,8 @@
     if (newFrame.size.width + newFrame.origin.x > self.frame.size.width)
         newFrame.size.width = self.frame.size.width - _cropBorderView.frame.origin.x;
     
-    if (newFrame.size.height + newFrame.origin.y > self.frame.size.height - toolbarSize)
-        newFrame.size.height = self.frame.size.height  - _cropBorderView.frame.origin.y - toolbarSize;
+    if (newFrame.size.height + newFrame.origin.y > self.frame.size.height)
+        newFrame.size.height = self.frame.size.height  - _cropBorderView.frame.origin.y;
     return newFrame;
 }
 

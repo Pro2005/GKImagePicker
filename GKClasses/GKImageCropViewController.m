@@ -9,10 +9,12 @@
 #import "GKImageCropViewController.h"
 #import "GKImageCropView.h"
 
+#define HORIZONTAL_TEXT_PADDING 13.f
+
 @interface GKImageCropViewController ()
 
 @property (nonatomic, strong) GKImageCropView *imageCropView;
-@property (nonatomic, strong) UIToolbar *toolbar;
+@property (nonatomic, strong) UIView *toolbarView;
 @property (nonatomic, strong) UIButton *cancelButton;
 @property (nonatomic, strong) UIButton *useButton;
 
@@ -30,7 +32,7 @@
 
 @synthesize sourceImage, cropSize, delegate;
 @synthesize imageCropView;
-@synthesize toolbar;
+@synthesize toolbarView;
 @synthesize cancelButton, useButton, resizeableCropArea;
 
 #pragma mark -
@@ -49,142 +51,121 @@
 
 
 - (void)_setupNavigationBar{
-    
-    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCancel 
+
+    self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
                                                                                           target:self 
                                                                                           action:@selector(_actionCancel)];
     
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"GKIuse", @"")
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Use", @"Use")
                                                                               style:UIBarButtonItemStyleBordered 
                                                                              target:self 
                                                                              action:@selector(_actionUse)];
 }
 
 
+#pragma mark -
+#pragma mark - Crop Rect Normalizing
+
+- (CGSize)normalizedCropSizeForRect:(CGRect)rect
+{
+    CGSize normalizedSize;
+    CGSize maxSize = CGSizeMake(rect.size.width - (2 * TOOLBAR_PADDING),
+                                rect.size.height - (2. * (TOOLBAR_HEIGHT + TOOLBAR_PADDING)));
+    if (self.cropSize.height / self.cropSize.width > maxSize.height / maxSize.width) {
+        normalizedSize = CGSizeMake(self.cropSize.width * maxSize.height / self.cropSize.height,
+                                    maxSize.height);
+    } else {
+        normalizedSize = CGSizeMake(maxSize.width,
+                                    self.cropSize.height * maxSize.width / self.cropSize.width);
+    }
+    return normalizedSize;
+}
+
 - (void)_setupCropView{
     
     self.imageCropView = [[GKImageCropView alloc] initWithFrame:self.view.bounds];
     [self.imageCropView setImageToCrop:sourceImage];
     [self.imageCropView setResizableCropArea:self.resizeableCropArea];
-    [self.imageCropView setCropSize:cropSize];
+    [self.imageCropView setCropSize:[self normalizedCropSizeForRect:self.view.bounds]];
+    self.imageCropView.clipsToBounds = YES;
     [self.view addSubview:self.imageCropView];
 }
 
+- (CGSize)sizeForString:(NSString *)string withFont:(UIFont *)font{
+    NSMutableDictionary *attributes = [[NSMutableDictionary alloc] init];
+    attributes[NSFontAttributeName] = font;
+    
+    CGSize constrainedSize = CGSizeMake(320.f, TOOLBAR_HEIGHT);
+    CGSize neededSize = CGSizeMake(0, 0);
+
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 70000
+    if (([[[UIDevice currentDevice] systemVersion] compare:@"7.0" options:NSNumericSearch] != NSOrderedAscending))
+        neededSize = [string boundingRectWithSize:constrainedSize
+                                          options:NSStringDrawingUsesLineFragmentOrigin
+                                       attributes:attributes
+                                          context:nil].size;
+    else
+        neededSize = [string sizeWithFont:font
+                        constrainedToSize:constrainedSize
+                            lineBreakMode:NSLineBreakByTruncatingMiddle];
+#else
+    neededSize = [string sizeWithFont:font
+                        constrainedToSize:constrainedSize
+                        lineBreakMode:NSLineBreakByTruncatingMiddle];
+#endif
+    return CGSizeMake(neededSize.width, TOOLBAR_HEIGHT);
+}
+
+- (UIFont *)buttonFont
+{
+    return  [UIFont systemFontOfSize:18.f];
+}
+
 - (void)_setupCancelButton{
-	
-    if (floor(NSFoundationVersionNumber) > NSFoundationVersionNumber_iOS_6_1) {
-        self.cancelButton = [UIButton buttonWithType:UIButtonTypeCustom];
-		
-        [[self.cancelButton titleLabel] setFont:[UIFont boldSystemFontOfSize:16]];
-        [[self.cancelButton titleLabel] setShadowOffset:CGSizeMake(0, -1)];
-        [self.cancelButton setFrame:CGRectMake(0, 0, 58, 30)];
-        [self.cancelButton setTitle:NSLocalizedString(@"GKIcancel",@"") forState:UIControlStateNormal];
-        [self.cancelButton setTitleShadowColor:[UIColor colorWithRed:0.118 green:0.247 blue:0.455 alpha:1] forState:UIControlStateNormal];
-        [self.cancelButton  addTarget:self action:@selector(_actionCancel) forControlEvents:UIControlEventTouchUpInside];
-    } else {
-        self.cancelButton = [UIButton buttonWithType:UIButtonTypeCustom];
-		
-        [self.cancelButton setBackgroundImage:[[UIImage imageNamed:@"PLCameraSheetButton.png"] stretchableImageWithLeftCapWidth:5 topCapHeight:0] forState:UIControlStateNormal];
-        [self.cancelButton setBackgroundImage:[[UIImage imageNamed:@"PLCameraSheetButtonPressed.png"] stretchableImageWithLeftCapWidth:5 topCapHeight:0] forState:UIControlStateHighlighted];
-		
-        [[self.cancelButton titleLabel] setFont:[UIFont boldSystemFontOfSize:11]];
-        [[self.cancelButton titleLabel] setShadowOffset:CGSizeMake(0, 1)];
-        [self.cancelButton setFrame:CGRectMake(0, 0, 50, 30)];
-        [self.cancelButton setTitle:NSLocalizedString(@"GKIcancel",@"") forState:UIControlStateNormal];
-        [self.cancelButton setTitleColor:[UIColor colorWithRed:0.173 green:0.176 blue:0.176 alpha:1] forState:UIControlStateNormal];
-        [self.cancelButton setTitleShadowColor:[UIColor colorWithRed:0.827 green:0.831 blue:0.839 alpha:1] forState:UIControlStateNormal];
-        [self.cancelButton  addTarget:self action:@selector(_actionCancel) forControlEvents:UIControlEventTouchUpInside];
-    }
+    CGSize buttonSize = [self sizeForString:NSLocalizedString(@"Cancel", @"Cancel")
+                                   withFont:[self buttonFont]];
+    
+    self.cancelButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [[self.cancelButton titleLabel] setFont:[self buttonFont]];
+    [self.cancelButton setFrame:CGRectMake(HORIZONTAL_TEXT_PADDING, 0, buttonSize.width, buttonSize.height)];
+    [self.cancelButton setTitle:NSLocalizedString(@"Cancel", @"Cancel") forState:UIControlStateNormal];
+    [self.cancelButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [self.cancelButton  addTarget:self action:@selector(_actionCancel) forControlEvents:UIControlEventTouchUpInside];
 }
 
 - (void)_setupUseButton{
+    CGSize buttonSize = [self sizeForString:NSLocalizedString(@"Use",@"Use")
+                                   withFont:[self buttonFont]];
     
-    if (floor(NSFoundationVersionNumber) > NSFoundationVersionNumber_iOS_6_1) {
-        self.useButton = [UIButton buttonWithType:UIButtonTypeCustom];
-		
-        [[self.useButton titleLabel] setFont:[UIFont boldSystemFontOfSize:16]];
-        [[self.useButton titleLabel] setShadowOffset:CGSizeMake(0, -1)];
-        [self.useButton setFrame:CGRectMake(0, 0, 58, 30)];
-        [self.useButton setTitle:NSLocalizedString(@"GKIuse",@"") forState:UIControlStateNormal];
-        [self.useButton setTitleShadowColor:[UIColor colorWithRed:0.118 green:0.247 blue:0.455 alpha:1] forState:UIControlStateNormal];
-        [self.useButton  addTarget:self action:@selector(_actionUse) forControlEvents:UIControlEventTouchUpInside];
-    } else {
-        self.useButton = [UIButton buttonWithType:UIButtonTypeCustom];
-		
-        [self.useButton setBackgroundImage:[[UIImage imageNamed:@"PLCameraSheetDoneButton.png"] stretchableImageWithLeftCapWidth:5 topCapHeight:0] forState:UIControlStateNormal];
-        [self.useButton setBackgroundImage:[[UIImage imageNamed:@"PLCameraSheetDoneButtonPressed.png"] stretchableImageWithLeftCapWidth:5 topCapHeight:0] forState:UIControlStateHighlighted];
-		
-        [[self.useButton titleLabel] setFont:[UIFont boldSystemFontOfSize:11]];
-        [[self.useButton titleLabel] setShadowOffset:CGSizeMake(0, -1)];
-        [self.useButton setFrame:CGRectMake(0, 0, 50, 30)];
-        [self.useButton setTitle:NSLocalizedString(@"GKIuse",@"") forState:UIControlStateNormal];
-        [self.useButton setTitleShadowColor:[UIColor colorWithRed:0.118 green:0.247 blue:0.455 alpha:1] forState:UIControlStateNormal];
-        [self.useButton  addTarget:self action:@selector(_actionUse) forControlEvents:UIControlEventTouchUpInside];
-    }
+    self.useButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    
+    [[self.useButton titleLabel] setFont:[self buttonFont]];
+    [self.useButton setFrame:CGRectMake(self.view.frame.size.width - (buttonSize.width + HORIZONTAL_TEXT_PADDING), 0, buttonSize.width, buttonSize.height)];
+    [self.useButton setTitle:NSLocalizedString(@"Use",@"Use") forState:UIControlStateNormal];
+    [self.useButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    [self.useButton  addTarget:self action:@selector(_actionUse) forControlEvents:UIControlEventTouchUpInside];
 }
 
-- (UIImage *)_toolbarBackgroundImage{
-    CGFloat components[] = {
-        1., 1., 1., 1.,
-        123./255., 125/255., 132./255., 1.
-    };
-	
-    UIGraphicsBeginImageContextWithOptions(CGSizeMake(320, 54), YES, 0.0);
-	
-    CGContextRef ctx = UIGraphicsGetCurrentContext();
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    CGGradientRef gradient = CGGradientCreateWithColorComponents(colorSpace, components, NULL, 2);
-	
-    CGContextDrawLinearGradient(ctx, gradient, CGPointMake(0, 0), CGPointMake(0, 54), kCGImageAlphaNoneSkipFirst);
-	
-    UIImage *viewImage = UIGraphicsGetImageFromCurrentImageContext();
-	
-    CGGradientRelease(gradient);
-    CGColorSpaceRelease(colorSpace);
-    UIGraphicsEndImageContext();
-	
-    return viewImage;
-}
 
 - (void)_setupToolbar{
     if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone) {
-        self.toolbar = [[UIToolbar alloc] initWithFrame:CGRectZero];
-        
-		
-        if (floor(NSFoundationVersionNumber) > NSFoundationVersionNumber_iOS_6_1) {
-            self.toolbar.translucent = YES;
-            self.toolbar.barStyle = UIBarStyleBlackOpaque;
-        } else {
-            [self.toolbar setBackgroundImage:[self _toolbarBackgroundImage] forToolbarPosition:UIToolbarPositionAny barMetrics:UIBarMetricsDefault];
-        }
-
-        [self.view addSubview:self.toolbar];
+        self.toolbarView = [[UIView alloc] initWithFrame:CGRectMake(0,
+                                                                   self.view.frame.size.height - TOOLBAR_HEIGHT,
+                                                                   self.view.frame.size.width,
+                                                                   TOOLBAR_HEIGHT)];
+        self.toolbarView.backgroundColor = [UIColor colorWithRed:20./255. green:20./255. blue:20./255. alpha:0.65];
+        [self.view addSubview:self.toolbarView];
         
         [self _setupCancelButton];
         [self _setupUseButton];
         
-        UILabel *info = [[UILabel alloc] initWithFrame:CGRectZero];
-        if (floor(NSFoundationVersionNumber) > NSFoundationVersionNumber_iOS_6_1) {
-            info.text = @"";
-        } else {
-            info.text = NSLocalizedString(@"GKImoveAndScale", @"");
-        }
-        
-        info.textColor = [UIColor colorWithRed:0.173 green:0.173 blue:0.173 alpha:1];
-        info.backgroundColor = [UIColor clearColor];
-        info.shadowColor = [UIColor colorWithRed:0.827 green:0.831 blue:0.839 alpha:1];
-        info.shadowOffset = CGSizeMake(0, 1);
-        info.font = [UIFont boldSystemFontOfSize:18];
-        [info sizeToFit];
-        
-        UIBarButtonItem *cancel = [[UIBarButtonItem alloc] initWithCustomView:self.cancelButton];
-        UIBarButtonItem *flex = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
-        UIBarButtonItem *lbl = [[UIBarButtonItem alloc] initWithCustomView:info];
-        UIBarButtonItem *use = [[UIBarButtonItem alloc] initWithCustomView:self.useButton];
-        
-        [self.toolbar setItems:[NSArray arrayWithObjects:cancel, flex, lbl, flex, use, nil]];
-
+        [self.toolbarView addSubview:self.cancelButton];
+        [self.toolbarView addSubview:self.useButton];
     }
+}
+
+- (BOOL)prefersStatusBarHidden {
+    return YES;
 }
 
 #pragma mark -
@@ -200,9 +181,10 @@
 
 - (void)viewDidLoad{
     [super viewDidLoad];
-    // Do any additional setup after loading the view.
+	// Do any additional setup after loading the view.
     
-    self.title = NSLocalizedString(@"GKIchoosePhoto", @"");
+    self.title = NSLocalizedString(@"Choose Photo", @"Choose Photo");
+    [[UIApplication sharedApplication] setStatusBarHidden:YES withAnimation:UIStatusBarAnimationNone];
 
     [self _setupNavigationBar];
     [self _setupCropView];
@@ -211,8 +193,8 @@
     if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPhone) {
         [self.navigationController setNavigationBarHidden:YES];
     } else {
-        [self.navigationController setNavigationBarHidden:NO];
-    }
+		[self.navigationController setNavigationBarHidden:NO];
+	}
 }
 
 - (void)viewDidUnload{
@@ -220,11 +202,17 @@
     // Release any retained subviews of the main view.
 }
 
+- (void)viewWillDisappear:(BOOL)animated
+{
+    [super viewWillDisappear:animated];
+    [[UIApplication sharedApplication] setStatusBarHidden:NO withAnimation:UIStatusBarAnimationNone];
+}
+
 - (void)viewWillLayoutSubviews{
     [super viewWillLayoutSubviews];
     
     self.imageCropView.frame = self.view.bounds;
-    self.toolbar.frame = CGRectMake(0, CGRectGetHeight(self.view.frame) - 54, 320, 54);
+    self.toolbarView.frame = CGRectMake(0, CGRectGetHeight(self.view.frame) - TOOLBAR_HEIGHT, 320, TOOLBAR_HEIGHT);
 }
 
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
